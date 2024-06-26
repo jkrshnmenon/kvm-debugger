@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/syscall.h>
 #include <linux/kvm.h>
+#include "kvm_utils.h"
 
 extern char **environ;
 
@@ -76,11 +77,11 @@ void trace_vm(char *vm_path) {
                 }
             } else if (regs.orig_rax == SYS_mmap) {
                 int fd = regs.r8;
-                if ((fd != -1) && check_vcpu_fd(child, &regs, fd)) {
+                if ((fd != -1) && check_vcpu_fd(fd)) {
                     ptrace(PTRACE_SYSCALL, child, 0, 0);
                     waitpid(child, &status, 0);
                     ptrace(PTRACE_GETREGS, child, 0, &regs);
-                    char *kvm_run = regs.rax;
+                    char *kvm_run = (char *)regs.rax;
                     update_vcpu_run(fd, kvm_run);
                 }
             }
