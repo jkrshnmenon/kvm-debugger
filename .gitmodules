@@ -1,0 +1,3 @@
+[submodule "tests/kvm-hello-world"]
+	path = tests/kvm-hello-world
+	url = https://github.com/dpw/kvm-hello-world.git
