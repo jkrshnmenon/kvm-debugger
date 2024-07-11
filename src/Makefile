@@ -5,7 +5,7 @@ CFLAGS = -g -Wall
 
 all: debugger
 
-debugger: main.c kvm_utils.c
+debugger: main.c kvm_utils.c ptrace_utils.c
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:

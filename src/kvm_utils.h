@@ -1,5 +1,6 @@
 #include <stdio.h>
-#include <stdlib.h>
+#include <unistd.h>
+#include <sys/user.h>
 
 // A struct to hold the details of a KVM vcpu such as fd and pointer to KVM_RUN structure.
 struct vcpu {
@@ -18,6 +19,9 @@ int update_vcpu_run(int fd, char *kvm_run);
 
 // A function to return the KVM_RUN pointer given a vcpu fd
 char *get_vcpu_run(int fd);
+
+// A function to return the offset of the exit_reason field in the KVM_RUN structure
+char *exit_reason_ptr(char *kvm_run);
 
 // A function handle the KVM_EXIT conditions
 void handle_kvm_exit(int vcpu_fd);
