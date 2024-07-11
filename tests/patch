@@ -1,9 +1,19 @@
 diff --git a/Makefile b/Makefile
-index 22b6a98..e1ffc43 100644
+index 22b6a98..a047c4b 100644
 --- a/Makefile
 +++ b/Makefile
-@@ -11,7 +11,7 @@ kvm-hello-world: kvm-hello-world.o payload.o
- 	$(CC) $^ -o $@
+@@ -1,4 +1,4 @@
+-CFLAGS = -Wall -Wextra -Werror -O2
++CFLAGS = -no-pie -Wall -Wextra -Werror -O2
+ 
+ .PHONY: run
+ run: kvm-hello-world
+@@ -8,10 +8,10 @@ run: kvm-hello-world
+ 	./kvm-hello-world -l
+ 
+ kvm-hello-world: kvm-hello-world.o payload.o
+-	$(CC) $^ -o $@
++	$(CC) -no-pie $^ -o $@
  
  payload.o: payload.ld guest16.o guest32.img.o guest64.img.o
 -	$(LD) -T $< -o $@
@@ -11,3 +21,15 @@ index 22b6a98..e1ffc43 100644
  
  guest64.o: guest.c
  	$(CC) $(CFLAGS) -m64 -ffreestanding -fno-pic -c -o $@ $^
+diff --git a/guest.c b/guest.c
+index 9aedd66..761593a 100644
+--- a/guest.c
++++ b/guest.c
+@@ -16,6 +16,7 @@ _start(void) {
+ 
+ 	*(long *) 0x400 = 42;
+ 
++	asm("int3");
+ 	for (;;)
+ 		asm("hlt" : /* empty */ : "a" (42) : "memory");
+ }
