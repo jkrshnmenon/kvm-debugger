@@ -27,3 +27,16 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 <input disabled="" type="checkbox"> Send registers to GDB for debugging
 <input disabled="" type="checkbox"> Handle other VM exit codes appropriately
 <input disabled="" type="checkbox"> Test the debugger with different scenarios
+
+
+## Progress
+
+<input disabled="" type="checkbox"> Use PTRACE to track the ioctl and mmap calls
+<input disabled="" type="checkbox"> Identify the VCPU fd and KVM_RUN pointers
+<input disabled="" type="checkbox"> Trap the KVM_RUN ioctl and read the exit reason from KVM_RUN pointer
+<input disabled="" type="checkbox"> Automatically find a location in the process BSS to inject data into
+<input disabled="" type="checkbox"> Inject the `kvm_guest_debug` structure into the process memory
+<input disabled="" type="checkbox"> Modify the arguments for one syscall to KVM_SET_GUEST_DEBUG
+<input disabled="" type="checkbox"> Fix the process so that it runs the original syscall
+<input disabled="" type="checkbox"> Figure out a better way to execute arbitrary ioctl in process
+
