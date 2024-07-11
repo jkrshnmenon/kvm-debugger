@@ -42,7 +42,7 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 - [x] Trap the KVM_RUN ioctl and read the exit reason from KVM_RUN pointer
 
-- [ ] Automatically find a location in the process BSS to inject data into
+- [x] Automatically find a location in the process BSS to inject data into
 
 - [x] Inject the `kvm_guest_debug` structure into the process memory
 
