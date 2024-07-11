@@ -10,6 +10,7 @@
 #include <linux/kvm.h>
 #include "kvm_utils.h"
 #include "ptrace_utils.h"
+#include "utils.h"
 
 extern char **environ;
 extern struct kvm_guest_debug dbg;
@@ -70,15 +71,15 @@ void trace_vm(char *vm_path, char **vm_args) {
                         memset(&dbg, 0, sizeof(dbg));
                         dbg.control = KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_SW_BP;
 
-                        // TODO: Find the address in the bss dynamically
-                        if ( write_proc_memory(child, (void *)0x404300, (char *)&dbg, sizeof(dbg)) != sizeof(dbg)) {
+			void *addr = bss_addr(child);
+                        if ( write_proc_memory(child, addr, (char *)&dbg, sizeof(dbg)) != sizeof(dbg)) {
                             perror("write_proc_memory");
                             exit(EXIT_FAILURE);
                         }
 
                         // Set the new register values
                         // printf("[*] Before rsi = %llx, rdx = %llx\n", regs.rsi, regs.rdx);
-                        regs.rdx = 0x404300;
+                        regs.rdx = (unsigned long) addr;
                         regs.rsi = KVM_SET_GUEST_DEBUG;
                         set_syscall_regs(child, &regs);
 
