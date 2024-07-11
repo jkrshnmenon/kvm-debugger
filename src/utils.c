@@ -2,6 +2,7 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
+#include "utils.h"
 
 void *bss_addr(pid_t child) {
     char fname[100];
@@ -29,4 +30,44 @@ void *bss_addr(pid_t child) {
         return (void *)ret_val+0x300;
     }
     return NULL;
+}
+
+void log_debug(FILE *stream, const char *format, ...) {
+    va_list args;
+    printf("%s", BLUE);
+    printf("[DEBUG] ");
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    printf("%s", RESET);
+}
+
+void log_info(FILE *stream, const char *format, ...) {
+    va_list args;
+    printf("%s", GREEN);
+    printf("[INFO] ");
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    printf("%s", RESET);
+}
+
+void log_warn(FILE *stream, const char *format, ...) {
+    va_list args;
+    printf("%s", YELLOW);
+    printf("[WARN] ");
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    printf("%s", RESET);
+}
+
+void log_error(FILE *stream, const char *format, ...) {
+    va_list args;
+    printf("%s", RED);
+    printf("[ERROR] ");
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
+    printf("%s", RESET);
 }

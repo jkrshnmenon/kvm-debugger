@@ -7,6 +7,7 @@
 #include <linux/kvm.h>
 #include <sys/user.h>
 #include "kvm_utils.h"
+#include "utils.h"
 
 // A table of vcpu's
 struct vcpu *vcpu_table = NULL;
@@ -15,7 +16,7 @@ struct kvm_guest_debug dbg;
 
 // A function to add a new entry into the vcpu_table with the given fd and kvm_run pointer set to NULL
 int append_vcpu(int fd) {
-    // printf("Appending new vcpu with fd: %d\n", fd);
+    log_debug(stderr, "Appending new vcpu with fd: %d\n", fd);
     struct vcpu *new_table = realloc(vcpu_table, sizeof(struct vcpu) * (vcpu_table_size + 1));
     if (new_table == NULL) {
         return -1;
@@ -32,7 +33,7 @@ int append_vcpu(int fd) {
 int check_vcpu_fd(int fd) {
     for (size_t i = 0; i < vcpu_table_size; i++) {
         if (vcpu_table[i].fd == fd) {
-            // printf("Found vcpu with fd: %d\n", fd);
+            log_debug(stderr, "Found vcpu with fd: %d\n", fd);
             return 1;
         }
     }
@@ -42,7 +43,7 @@ int check_vcpu_fd(int fd) {
 
 // A function to update the KVM_RUN pointer of a vcpu given the fd
 int update_vcpu_run(int fd, char *kvm_run) {
-    // printf("Updating vcpu with fd: %d with kvm_run pointer: %p\n", fd, kvm_run);
+    log_debug(stderr, "Updating vcpu with fd: %d with kvm_run pointer: %p\n", fd, kvm_run);
     for (size_t i = 0; i < vcpu_table_size; i++) {
         if (vcpu_table[i].fd == fd) {
             vcpu_table[i].kvm_run = kvm_run;
@@ -57,7 +58,7 @@ int update_vcpu_run(int fd, char *kvm_run) {
 char *get_vcpu_run(int fd) {
     for (size_t i = 0; i < vcpu_table_size; i++) {
         if (vcpu_table[i].fd == fd) {
-            // printf("Found kvm_run pointer: %p for vcpu with fd: %d\n", vcpu_table[i].kvm_run, fd);
+            log_debug(stderr, "Found kvm_run pointer: %p for vcpu with fd: %d\n", vcpu_table[i].kvm_run, fd);
             return vcpu_table[i].kvm_run;
         }
     }
@@ -72,19 +73,19 @@ char *exit_reason_ptr(char *kvm_run) {
 
 // A function handle the KVM_EXIT conditions
 void handle_kvm_exit(int exit_condition) {
-	// printf("Checking exit_condition: %d\n", exit_condition);
+	log_debug(stderr, "Checking exit_condition: %d\n", exit_condition);
     switch (exit_condition) {
         case KVM_EXIT_DEBUG:
-            printf("KVM_EXIT_DEBUG MOTHERFUCKER\n");
+            log_info(stderr, "KVM_EXIT_DEBUG MOTHERFUCKER\n");
             break;
         case KVM_EXIT_HLT:
-            // printf("KVM_EXIT_HLT\n");
+            log_info(stderr, "KVM_EXIT_HLT\n");
             break;
         case KVM_EXIT_IO:
-            // printf("KVM_EXIT_IO\n");
+            log_info(stderr, "KVM_EXIT_IO\n");
             break;
         default:
-            // printf("Some other KVM_EXIT\n");
+            // log_info(stderr, "Some other KVM_EXIT\n");
             break;
     }
 }
