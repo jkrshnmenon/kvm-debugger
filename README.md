@@ -7,7 +7,7 @@ In situations where the source code of the hypervisor isn't available, it might 
 
 So I decided to make this thing that basically creates a GDB interface for the VM using `KVM_EXIT_DEBUG`.
 
-The only assumption is that the VM has enabled debug mode `ioctl(vcpu, KVM_SET_GUEST_DEBUG, {KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP})`
+~~The only assumption is that the VM has enabled debug mode `ioctl(vcpu, KVM_SET_GUEST_DEBUG, {KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP})`~~
 
 
 ## Implementation
@@ -48,6 +48,6 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 - [x] Modify the arguments for one syscall to KVM_SET_GUEST_DEBUG
 
-- [ ] Fix the process so that it runs the original syscall
+- [x] Fix the process so that it runs the original syscall
 
 - [ ] Figure out a better way to execute arbitrary ioctl in process
