@@ -21,33 +21,33 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 ## Status
 
-[x] Implement the wrapper function for KVM_RUN ioctl
+- [x] Implement the wrapper function for KVM_RUN ioctl
 
-[x] Handle KVM_EXIT_DEBUG exit code in the wrapper function
+- [x] Handle KVM_EXIT_DEBUG exit code in the wrapper function
 
-[ ] Retrieve registers from the VM using KVM functions
+- [ ] Retrieve registers from the VM using KVM functions
 
-[ ] Send registers to GDB for debugging
+- [ ] Send registers to GDB for debugging
 
-[ ] Handle other VM exit codes appropriately
+- [ ] Handle other VM exit codes appropriately
 
-[ ] Test the debugger with different scenarios
+- [ ] Test the debugger with different scenarios
 
 
 ## Progress
 
-[x] Use PTRACE to track the ioctl and mmap calls
+- [x] Use PTRACE to track the ioctl and mmap calls
 
-[x] Identify the VCPU fd and KVM_RUN pointers
+- [x] Identify the VCPU fd and KVM_RUN pointers
 
-[x] Trap the KVM_RUN ioctl and read the exit reason from KVM_RUN pointer
+- [x] Trap the KVM_RUN ioctl and read the exit reason from KVM_RUN pointer
 
-[ ] Automatically find a location in the process BSS to inject data into
+- [ ] Automatically find a location in the process BSS to inject data into
 
-[x] Inject the `kvm_guest_debug` structure into the process memory
+- [x] Inject the `kvm_guest_debug` structure into the process memory
 
-[x] Modify the arguments for one syscall to KVM_SET_GUEST_DEBUG
+- [x] Modify the arguments for one syscall to KVM_SET_GUEST_DEBUG
 
-[ ] Fix the process so that it runs the original syscall
+- [ ] Fix the process so that it runs the original syscall
 
-[ ] Figure out a better way to execute arbitrary ioctl in process
+- [ ] Figure out a better way to execute arbitrary ioctl in process
