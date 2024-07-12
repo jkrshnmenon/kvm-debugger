@@ -3,6 +3,7 @@
 #include <sys/user.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
@@ -54,7 +55,41 @@ int finish_syscall(pid_t child, struct user_regs_struct *regs) {
     return 0;
 }
 
+int execute_ioctl(size_t syscall_ins_addr, pid_t child, size_t arg1, size_t arg2, size_t arg3, struct user_regs_struct *regs) {
+    // Set the RIP to point to the syscall instruction
+    regs->rip = syscall_ins_addr;
+    unsigned char *foo = read_proc_memory(child, (void *)regs->rip, 2);
+    // syscall instruction is 0x0f05
+    assert(foo[0] == 0x0f);
+    assert(foo[1] == 0x05);
 
+    set_regs(child, regs);
+
+    if (trace_one_syscall(child, regs) == 1) {
+        log_error(stderr, "trace_one_syscall failed\n");
+        perror("trace_one_syscall");
+        exit(EXIT_FAILURE);
+    }
+
+    // Set the new register values
+    regs->rdx = arg3;
+    regs->rsi = arg2;
+    regs->rdi = arg1;
+    regs->orig_rax = SYS_ioctl;
+    set_regs(child, regs);
+
+    // Do the syscall
+    if (finish_syscall(child, regs) == 1 ) {
+        log_error(stderr, "finish_syscall failed\n");
+        perror("finish_syscall");
+        exit(EXIT_FAILURE);
+    }
+    if ( (long)regs->rax < 0 ) {
+        log_error(stderr, "ioctl failed");
+        exit(EXIT_FAILURE);
+    }
+    return regs->rax;
+}
 
 int trace_one_instruction(pid_t child, struct user_regs_struct *regs) {
     ptrace(PTRACE_SINGLESTEP, child, 0, 0);
@@ -63,7 +98,7 @@ int trace_one_instruction(pid_t child, struct user_regs_struct *regs) {
 }
 
 
-int set_syscall_regs(pid_t child, struct user_regs_struct *regs) {
+int set_regs(pid_t child, struct user_regs_struct *regs) {
     ptrace(PTRACE_SETREGS, child, 0, regs);
     return 0;
 }

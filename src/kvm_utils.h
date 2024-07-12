@@ -25,3 +25,5 @@ char *exit_reason_ptr(char *kvm_run);
 
 // A function handle the KVM_EXIT conditions
 void handle_kvm_exit(int vcpu_fd);
+
+int is_kvm_exit_debug(int exit_reason);

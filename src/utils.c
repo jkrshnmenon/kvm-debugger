@@ -4,6 +4,13 @@
 #include <string.h>
 #include "utils.h"
 
+#define LOG_LEVEL_DEBUG 0
+#define LOG_LEVEL_INFO 1
+#define LOG_LEVEL_WARN 2
+#define LOG_LEVEL_ERROR 3
+
+#define CUR_LOG_LEVEL LOG_LEVEL_DEBUG
+
 void *bss_addr(pid_t child) {
     char fname[100];
     snprintf(fname, 100, "/proc/%d/maps", child);
@@ -33,6 +40,9 @@ void *bss_addr(pid_t child) {
 }
 
 void log_debug(FILE *stream, const char *format, ...) {
+    if (CUR_LOG_LEVEL > LOG_LEVEL_DEBUG) {
+        return;
+    }
     va_list args;
     printf("%s", BLUE);
     printf("[DEBUG] ");
@@ -43,6 +53,9 @@ void log_debug(FILE *stream, const char *format, ...) {
 }
 
 void log_info(FILE *stream, const char *format, ...) {
+    if (CUR_LOG_LEVEL > LOG_LEVEL_INFO) {
+        return;
+    }
     va_list args;
     printf("%s", GREEN);
     printf("[INFO] ");
@@ -53,6 +66,9 @@ void log_info(FILE *stream, const char *format, ...) {
 }
 
 void log_warn(FILE *stream, const char *format, ...) {
+    if (CUR_LOG_LEVEL > LOG_LEVEL_WARN) {
+        return;
+    }
     va_list args;
     printf("%s", YELLOW);
     printf("[WARN] ");
@@ -63,6 +79,9 @@ void log_warn(FILE *stream, const char *format, ...) {
 }
 
 void log_error(FILE *stream, const char *format, ...) {
+    if (CUR_LOG_LEVEL > LOG_LEVEL_ERROR) {
+        return;
+    }
     va_list args;
     printf("%s", RED);
     printf("[ERROR] ");

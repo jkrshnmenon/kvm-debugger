@@ -34,9 +34,9 @@ int start_vm(char *vm_path, char **vm_args) {
 
     if (child == 0) {
         // Make the child process write to the pipes
-        dup2(stdin_fd[1], STDIN_FILENO);
-        dup2(stdout_fd[1], STDOUT_FILENO);
-        dup2(stderr_fd[1], STDERR_FILENO);
+        //dup2(stdin_fd[1], STDIN_FILENO);
+        //dup2(stdout_fd[1], STDOUT_FILENO);
+        //dup2(stderr_fd[1], STDERR_FILENO);
         ptrace(PTRACE_TRACEME, 0, NULL, NULL);
         execve(vm_path, vm_args, environ);
         log_error(stderr, "Execve failed\n");
@@ -86,6 +86,7 @@ void trace_vm(char *vm_path, char **vm_args) {
                         }
                         assert(regs.rax >= 0);
                         log_debug(stderr, "KVM_GET_SREGS success: %llx\n", regs.rax);
+
                         memcpy(&saved_regs_ptr, &regs, sizeof(struct user_regs_struct));
 			
                         // Write the debug structure into the process memory
@@ -99,41 +100,12 @@ void trace_vm(char *vm_path, char **vm_args) {
                             exit(EXIT_FAILURE);
                         }
 
-                        // Reset RIP to syscall instruction
-                        regs.rip = regs.rip - 2;
-                        unsigned char *foo = read_proc_memory(child, (void *)regs.rip, 2);
-                        // syscall instruction is 0x0f05
-                        assert(foo[0] == 0x0f);
-                        assert(foo[1] == 0x05);
+                        execute_ioctl(regs.rip - 2, child, vcpu_fd, KVM_SET_GUEST_DEBUG, (size_t)addr, &regs);
 
-                        set_syscall_regs(child, &regs);
-                        if (trace_one_syscall(child, &regs) == 1) {
-                            log_error(stderr, "trace_one_syscall failed\n");
-                            perror("trace_one_syscall");
-                            exit(EXIT_FAILURE);
-                        }
-
-                        // Set the new register values
-                        regs.rdx = (unsigned long) addr;
-                        regs.rsi = KVM_SET_GUEST_DEBUG;
-                        regs.rdi = vcpu_fd;
-                        regs.orig_rax = SYS_ioctl;
-                        set_syscall_regs(child, &regs);
-
-                        // Do the syscall
-                        if (finish_syscall(child, &regs) == 1 ) {
-                            log_error(stderr, "finish_syscall failed\n");
-                            perror("finish_syscall");
-                            exit(EXIT_FAILURE);
-                        }
-                        if ( (long)regs.rax < 0 ) {
-                            log_error(stderr, "ioctl KVM_SET_GUESTDBG failed");
-                            exit(EXIT_FAILURE);
-                        }
                         log_debug(stderr, "KVM_SET_GUESTDBG ioctl successful: %llx\n", regs.rax);
 
                         // Reset the registers to the old state
-                        set_syscall_regs(child, &saved_regs_ptr);
+                        set_regs(child, &saved_regs_ptr);
                         enabled = 1;
                         break;
                     }
@@ -144,10 +116,33 @@ void trace_vm(char *vm_path, char **vm_args) {
                         perror("fiinsh_syscall");
                         exit(EXIT_FAILURE);
                     }
+
+                    struct kvm_regs *ptr;
+                    void *addr = bss_addr(child);
+                    size_t syscall_ins = regs.rip - 2;
+
+                    execute_ioctl(syscall_ins, child, vcpu_fd, KVM_GET_REGS, (size_t)addr, &regs);
+                    ptr = (struct kvm_regs *)read_proc_memory(child, addr, sizeof(struct kvm_regs));
+                    // Apparently this is what enables the single step mode
+                    ptr->rflags |= 0x100;
+
+                    write_proc_memory(child, addr, (char *)ptr, sizeof(struct kvm_regs));
+                    execute_ioctl(syscall_ins, child, vcpu_fd, KVM_SET_REGS, (size_t)addr, &regs);
+
+                    execute_ioctl(regs.rip - 2, child, vcpu_fd, KVM_RUN, 0, &regs);
+
                     kvm_run = get_vcpu_run(vcpu_fd);
                     exit_reason_offset = (void *)exit_reason_ptr(kvm_run);
                     exit_reason = *(long *)read_proc_memory(child, exit_reason_offset, sizeof(long));
-                    handle_kvm_exit(exit_reason);
+                    while (is_kvm_exit_debug(exit_reason)) {
+                        log_info(stderr, "KVM_EXIT_DEBUG\n");
+                        execute_ioctl(syscall_ins, child, vcpu_fd, KVM_GET_REGS, (size_t)addr, &regs);
+                        ptr = (struct kvm_regs *)read_proc_memory(child, addr, sizeof(struct kvm_regs));
+                        log_info(stderr, "VM RIP: %llx\n", ptr->rip);
+                        // ptr->rip += 1;
+                        execute_ioctl(regs.rip - 2, child, vcpu_fd, KVM_RUN, 0, &regs);
+                        exit_reason = *(long *)read_proc_memory(child, exit_reason_offset, sizeof(long));
+                    }
                     break;
                 default:
                     if (finish_syscall(child, &regs) == 1) {

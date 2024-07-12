@@ -89,3 +89,7 @@ void handle_kvm_exit(int exit_condition) {
             break;
     }
 }
+
+int is_kvm_exit_debug(int exit_condition) {
+    return exit_condition == KVM_EXIT_DEBUG;
+}
