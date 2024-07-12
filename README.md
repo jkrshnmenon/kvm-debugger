@@ -25,7 +25,7 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 - [x] Handle KVM_EXIT_DEBUG exit code in the wrapper function
 
-- [ ] Retrieve registers from the VM using KVM functions
+- [x] Retrieve registers from the VM using KVM functions
 
 - [ ] Send registers to GDB for debugging
 
@@ -50,4 +50,4 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 - [x] Fix the process so that it runs the original syscall
 
-- [ ] Figure out a better way to execute arbitrary ioctl in process
+- [x] Figure out a better way to execute arbitrary ioctl in process
