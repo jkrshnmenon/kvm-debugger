@@ -1,1 +1,3 @@
+**/Cargo.lock
 src/debugger
+kvm_debugger/target/
