@@ -20,7 +20,7 @@ int trace_one_syscall(pid_t child, struct user_regs_struct *regs) {
     log_debug(stderr, "Entering trace_one_syscall\n");
     if ( cur_state != POST_SYSCALL) {
         log_error(stderr, "Invalid cur_state: %d\n", cur_state);
-	exit(EXIT_FAILURE);
+	    exit(EXIT_FAILURE);
     }
     int status;
     ptrace(PTRACE_SYSCALL, child, 0, 0);
