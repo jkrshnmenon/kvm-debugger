@@ -1,6 +1,11 @@
 use libc;
 use std::{ptr, process};
 
+const PRE_SYSCALL: u32 = 0;
+const POST_SYSCALL: u32 = 1;
+
+static mut cur_state: u32 = POST_SYSCALL;
+
 pub fn enable_tracing() {
     unsafe {
         if libc::ptrace(
@@ -28,4 +33,47 @@ pub fn set_tracesysgood(pid: i32) {
             }
     }
     println!("Set PTRACE_SETOPTIONS: PTRACE_O_TRACESYSGOOD");
+}
+
+
+pub fn trace_one_syscall(pid: i32, regs: &mut libc::user_regs_struct) -> bool {
+    unsafe {
+        if cur_state != POST_SYSCALL {
+            eprintln!("Unexpected state!");
+            process::exit(1);
+        }
+    }
+    unsafe {
+        if libc::ptrace(
+            libc::PTRACE_SYSCALL,
+            pid,
+            ptr::null_mut::<libc::c_void>(),
+            ptr::null_mut::<libc::c_void>()) < 0 {
+                eprintln!("ptrace(PTRACE_SYSCALL) failed!");
+                process::exit(1);
+            }
+    }
+
+    let mut status: i32 = 0;
+    unsafe {
+        let _ = libc::waitpid(pid, &mut status, 0);
+    }
+
+    if status != 0 {
+        eprintln!("waitpid failed!");
+        process::exit(1);
+    }
+
+    unsafe {
+        cur_state = PRE_SYSCALL;
+    }
+
+    unsafe {
+        libc::ptrace(
+            libc::PTRACE_GETREGS,
+            pid,
+            ptr::null_mut::<libc::c_void>(),
+            regs as *mut libc::user_regs_struct as *mut libc::c_void);
+    }
+    true
 }

@@ -6,7 +6,7 @@ use libc;
 
 use crate::ptrace::{
     enable_tracing,
-    set_tracesysgood,
+    set_tracesysgood, trace_one_syscall,
 };
 
 #[derive(Parser, Debug)]
@@ -41,7 +41,7 @@ struct KvmDebugger {
 
 
 impl KvmDebugger {
-    fn fork_and_exec_vm(&self) -> i32 {
+    fn fork_and_exec_vm(&mut self) -> i32 {
         unsafe {
             let pid = libc::fork();
             if pid == 0 {
@@ -73,13 +73,27 @@ impl KvmDebugger {
                 // makes it easy for the tracer to distinguish normal
                 // traps from those caused by a system call
                 set_tracesysgood(pid);
+                self.vm.pid = pid;
                 pid
             }
         }
     }
 
-    fn setup_kvm_guestdbg(self) {
-        // TODO
+    fn setup_kvm_guestdbg(&self) {
+        // TODO: Need to catch the Mmap syscall and the ioctl syscall
+        let mut regs: libc::user_regs_struct;
+        while trace_one_syscall(self.vm.pid, &mut regs) {
+            match regs.orig_rax {
+                9 => {
+                    // mmap
+                    println!("mmap syscall");
+                },
+                16 => {
+                    // ioctl
+                    println!("ioctl syscall");
+                },
+            }
+        }
     }
 }
 
