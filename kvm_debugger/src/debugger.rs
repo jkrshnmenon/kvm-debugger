@@ -81,8 +81,8 @@ impl KvmDebugger {
 
     fn setup_kvm_guestdbg(&self) {
         // TODO: Need to catch the Mmap syscall and the ioctl syscall
-        let mut regs: libc::user_regs_struct;
-        while trace_one_syscall(self.vm.pid, &mut regs) {
+        loop {
+            let regs = trace_one_syscall(self.vm.pid);
             match regs.orig_rax {
                 9 => {
                     // mmap
@@ -92,6 +92,9 @@ impl KvmDebugger {
                     // ioctl
                     println!("ioctl syscall");
                 },
+                _ => {
+                    println!("Unknown syscall");
+                }
             }
         }
     }
@@ -105,7 +108,7 @@ pub fn start_debugger(args: Args) {
         vcpus: BTreeMap::new()
     };
 
-    let debugger = KvmDebugger {
+    let mut debugger = KvmDebugger {
         args,
         vm
     };

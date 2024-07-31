@@ -4,7 +4,39 @@ use std::{ptr, process};
 const PRE_SYSCALL: u32 = 0;
 const POST_SYSCALL: u32 = 1;
 
-static mut cur_state: u32 = POST_SYSCALL;
+static mut CUR_STATE: u32 = POST_SYSCALL;
+
+pub fn default_regs() -> libc::user_regs_struct {
+    libc::user_regs_struct {
+        r15: 0,
+        r14: 0,
+        r13: 0,
+        r12: 0,
+        rbp: 0,
+        rbx: 0,
+        r11: 0,
+        r10: 0,
+        r9: 0,
+        r8: 0,
+        rax: 0,
+        rcx: 0,
+        rdx: 0,
+        rsi: 0,
+        rdi: 0,
+        orig_rax: 0,
+        rip: 0,
+        cs: 0,
+        eflags: 0,
+        rsp: 0,
+        ss: 0,
+        fs_base: 0,
+        gs_base: 0,
+        ds: 0,
+        es: 0,
+        fs: 0,
+        gs: 0,
+    }
+}
 
 pub fn enable_tracing() {
     unsafe {
@@ -36,9 +68,9 @@ pub fn set_tracesysgood(pid: i32) {
 }
 
 
-pub fn trace_one_syscall(pid: i32, regs: &mut libc::user_regs_struct) -> bool {
+pub fn trace_one_syscall(pid: i32) -> libc::user_regs_struct {
     unsafe {
-        if cur_state != POST_SYSCALL {
+        if CUR_STATE != POST_SYSCALL {
             eprintln!("Unexpected state!");
             process::exit(1);
         }
@@ -65,15 +97,16 @@ pub fn trace_one_syscall(pid: i32, regs: &mut libc::user_regs_struct) -> bool {
     }
 
     unsafe {
-        cur_state = PRE_SYSCALL;
+        CUR_STATE = PRE_SYSCALL;
     }
 
+    let mut regs: libc::user_regs_struct = default_regs();
     unsafe {
         libc::ptrace(
             libc::PTRACE_GETREGS,
             pid,
             ptr::null_mut::<libc::c_void>(),
-            regs as *mut libc::user_regs_struct as *mut libc::c_void);
+            &mut regs as *mut libc::user_regs_struct);
     }
-    true
+    regs
 }
