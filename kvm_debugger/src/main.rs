@@ -1,5 +1,7 @@
-mod debugger;
+mod kvm;
+mod utils;
 mod ptrace;
+mod debugger;
 
 use debugger::{start_debugger, Args};
 use clap::Parser;

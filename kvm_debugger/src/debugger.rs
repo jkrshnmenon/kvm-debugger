@@ -1,13 +1,30 @@
 // For argument parsing
 use clap::Parser;
+
 use std::collections::BTreeMap;
 use std::process;
+
 use libc;
+use kvm_bindings::{
+    kvm_guest_debug,
+    KVM_GUESTDBG_ENABLE,
+    KVM_GUESTDBG_SINGLESTEP,
+    KVM_GUESTDBG_USE_SW_BP,
+};
+use kvm_bindings::bindings::kvm_guest_debug_arch;
 
 use crate::ptrace::{
-    enable_tracing,
-    set_tracesysgood, trace_one_syscall,
+    enable_tracing, 
+    execute_ioctl, 
+    finish_syscall, 
+    set_tracesysgood, 
+    trace_one_syscall, 
+    write_proc_memory,
+    set_regs
 };
+
+use crate::kvm::*;
+use crate::utils::bss_addr;
 
 #[derive(Parser, Debug)]
 #[command(name = "KVM Debugger", version = "0.1", author = "Jayakrishna Menon <jkrshnmenon@gmail.com>", about = "A debugger of KVM based VMs")]
@@ -20,9 +37,6 @@ pub struct Args {
 }
 
 struct Vm {
-    /// The file descriptor for the VM
-    fd: u32,
-
     /// The PID of the child process
     pid: libc::pid_t,
 
@@ -79,21 +93,82 @@ impl KvmDebugger {
         }
     }
 
-    fn setup_kvm_guestdbg(&self) {
-        // TODO: Need to catch the Mmap syscall and the ioctl syscall
+    fn add_vcpu(&mut self, vcpu_fd: u32, kvm_run: u64) {
+        self.vm.vcpus.insert(vcpu_fd, kvm_run);
+    }
+
+    fn check_vcpu(&self, vcpu_fd: u32) -> bool {
+        self.vm.vcpus.contains_key(&vcpu_fd)
+    }
+
+    fn update_vcpu(&mut self, vcpu_fd: u32, kvm_run: u64) {
+        self.vm.vcpus.insert(vcpu_fd, kvm_run);
+    }
+
+    fn get_kvm_run(&self, vcpu_fd: u32) -> u64 {
+        *self.vm.vcpus.get(&vcpu_fd).unwrap()
+    }
+
+    fn setup_kvm_guestdbg(&mut self) {
+        let mut enabled = false;
         loop {
             let regs = trace_one_syscall(self.vm.pid);
-            match regs.orig_rax {
-                9 => {
-                    // mmap
-                    println!("mmap syscall");
+            match regs.orig_rax as i64 {
+                libc::SYS_mmap => {
+                    let fd = regs.r8 as u32;
+                    let result_regs = finish_syscall(self.vm.pid);
+                    if self.check_vcpu(fd) {
+                        self.update_vcpu(fd, result_regs.rax);
+                    }
                 },
-                16 => {
-                    // ioctl
-                    println!("ioctl syscall");
+                libc::SYS_ioctl => {
+                    let fd = regs.rdi as u32;
+                    let ioctl = regs.rsi;
+                    match ioctl {
+                        KVM_CREATE_VCPU => {
+                            self.add_vcpu(fd, 0)
+                        },
+                        KVM_GET_SREGS => {
+                            // Set up KVM debug stuff
+                            if enabled == false {
+                                let vcpu_fd = regs.rdi as u32;
+                                let mut result_regs = finish_syscall(self.vm.pid);
+                                assert_eq!(result_regs.rax, 0);
+
+                                let saved_regs = result_regs.clone();
+                                let dbg: kvm_guest_debug = kvm_guest_debug {
+                                    control: KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_SW_BP,
+                                    pad: 0,
+                                    arch: kvm_guest_debug_arch {
+                                        debugreg: [0; 8]
+                                    }
+                                };
+                                // Convert dbg into a slice of u8
+                                let content = unsafe {
+                                    std::slice::from_raw_parts(
+                                        &dbg as *const kvm_guest_debug as *const u8,
+                                        std::mem::size_of::<kvm_guest_debug>()
+                                    )
+                                };
+                                let addr: u64 = bss_addr(self.vm.pid).unwrap() as u64;
+                                write_proc_memory(self.vm.pid, addr, content);
+
+                                execute_ioctl(result_regs.rip - 2, self.vm.pid, vcpu_fd as u64, KVM_SET_GUEST_DEBUG, addr, &mut result_regs);
+
+                                set_regs(self.vm.pid, &saved_regs);
+                                enabled = true;
+                            }
+                        },
+                        KVM_RUN => {
+                            // Do the other thing
+                        },
+                        _ => {
+                            finish_syscall(self.vm.pid);
+                        }
+                    }
                 },
                 _ => {
-                    println!("Unknown syscall");
+                    _ = finish_syscall(self.vm.pid);
                 }
             }
         }
@@ -103,7 +178,6 @@ impl KvmDebugger {
 
 pub fn start_debugger(args: Args) {
     let vm = Vm {
-        fd: 0,
         pid: 0,
         vcpus: BTreeMap::new()
     };
