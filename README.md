@@ -33,6 +33,8 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 - [ ] Test the debugger with different scenarios
 
+- [ ] KVM diff snapshots for time-travel debugging
+
 
 ## Progress
 
