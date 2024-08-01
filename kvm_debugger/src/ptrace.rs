@@ -1,4 +1,14 @@
 #![allow(unused_assignments)]
+use errno::errno;
+use std::{
+    process, 
+    ptr
+};
+use log::{
+    trace, 
+    debug, 
+    error
+};
 use libc::{
     ptrace, 
     waitpid, 
@@ -14,9 +24,7 @@ use libc::{
     PTRACE_SETREGS, 
     PTRACE_PEEKDATA, 
     PTRACE_POKEDATA};
-use std::{process, ptr};
-use log::{info, debug, error};
-use errno::errno;
+
 
 const PRE_SYSCALL: u32 = 0;
 const POST_SYSCALL: u32 = 1;
@@ -66,7 +74,7 @@ pub fn enable_tracing() {
                 process::exit(1);
             }
     }
-    info!("Enabled PTRACE_TRACEME");
+    debug!("Enabled PTRACE_TRACEME");
 }
 
 
@@ -78,19 +86,19 @@ pub fn set_tracesysgood(pid: i32) {
             0,
             PTRACE_O_TRACESYSGOOD);
     }
-    info!("Set PTRACE_SETOPTIONS: PTRACE_O_TRACESYSGOOD: {}", pid);
+    debug!("Set PTRACE_SETOPTIONS: PTRACE_O_TRACESYSGOOD: {}", pid);
 }
 
 
 pub fn trace_one_syscall(pid: i32) -> user_regs_struct {
-    info!("Tracing one syscall for : {}", pid);
+    trace!("Tracing one syscall for : {}", pid);
     unsafe {
         if CUR_STATE != POST_SYSCALL {
             eprintln!("Unexpected state!");
             process::exit(1);
         }
     }
-    debug!("Calling ptrace(PTRACE_SYSCALL)");
+    trace!("Calling ptrace(PTRACE_SYSCALL)");
     unsafe {
         if ptrace(
             PTRACE_SYSCALL,
@@ -107,7 +115,7 @@ pub fn trace_one_syscall(pid: i32) -> user_regs_struct {
             }
     }
 
-    debug!("Going to waitpid");
+    trace!("Going to waitpid");
     let mut status: i32 = 0;
     unsafe {
         if waitpid(pid, &mut status, 0) == -1 {
@@ -123,7 +131,7 @@ pub fn trace_one_syscall(pid: i32) -> user_regs_struct {
         CUR_STATE = PRE_SYSCALL;
     }
 
-    debug!("Getting registers");
+    trace!("Getting registers");
     let mut regs: user_regs_struct = default_regs();
     unsafe {
         if ptrace(
@@ -139,14 +147,14 @@ pub fn trace_one_syscall(pid: i32) -> user_regs_struct {
 }
 
 pub fn finish_syscall(pid: i32) -> user_regs_struct {
-    info!("Finishing syscall");
+    trace!("Finishing syscall");
     unsafe {
         if CUR_STATE != PRE_SYSCALL {
             eprintln!("Unexpected state!");
             process::exit(1);
         }
     }
-    debug!("Calling ptrace(PTRACE_SYSCALL)");
+    trace!("Calling ptrace(PTRACE_SYSCALL)");
     unsafe {
         if ptrace(
             PTRACE_SYSCALL,
@@ -158,7 +166,7 @@ pub fn finish_syscall(pid: i32) -> user_regs_struct {
             }
     }
 
-    debug!("Going to waitpid");
+    trace!("Going to waitpid");
     let mut status: i32 = 0;
     unsafe {
         if waitpid(pid, &mut status, 0) == -1 {
@@ -174,7 +182,7 @@ pub fn finish_syscall(pid: i32) -> user_regs_struct {
         CUR_STATE = POST_SYSCALL;
     }
 
-    debug!("Getting registers");
+    trace!("Getting registers");
     let mut regs: user_regs_struct = default_regs();
     unsafe {
         if ptrace(
@@ -191,12 +199,11 @@ pub fn finish_syscall(pid: i32) -> user_regs_struct {
 
 
 pub fn read_proc_memory(pid: i32, addr: u64, len: usize) -> Vec<u8> {
-    debug!("Reading process memory: pid: {}, addr: {:#016x}, len: {}", pid, addr, len);
+    trace!("Reading process memory: pid: {}, addr: {:#016x}, len: {}", pid, addr, len);
     let mut content = Vec::<u8>::with_capacity(len);
     for x in (0..len).step_by(8) {
         let mut data: u64 = 0;
         // PEEKDATA reads a long value from the address
-        debug!("Reading from address: {:#016x}", addr + x as u64);
         unsafe {
             data = ptrace(
                 PTRACE_PEEKDATA,
@@ -204,7 +211,6 @@ pub fn read_proc_memory(pid: i32, addr: u64, len: usize) -> Vec<u8> {
                 addr + x as u64,
                 std::ptr::null_mut::<c_void>()) as u64;
         }
-        debug!("Got data: {:#016x}", data);
         let min = std::cmp::min(8, len - x);
         for j in 0..min {
             content.push(((data >> (j * 8)) & 0xff) as u8);
@@ -234,7 +240,7 @@ pub fn write_proc_memory(pid: i32, addr: u64, content: &[u8]) {
 
 
 pub fn set_regs(pid: i32, regs: &user_regs_struct) {
-    debug!("Setting registers");
+    trace!("Setting registers");
     unsafe {
         if ptrace(
             PTRACE_SETREGS,
@@ -259,7 +265,7 @@ pub fn execute_ioctl(
     arg2: u64, 
     arg3: u64, 
     regs: &mut user_regs_struct) -> u64 {
-    debug!("Executing ioctl: arg1={:#016x}, arg2={:#016x}, arg3={:#016x}", arg1, arg2, arg3);
+    trace!("Executing ioctl: arg1={:#016x}, arg2={:#016x}, arg3={:#016x}", arg1, arg2, arg3);
 
     regs.rip = syscall_ins_addr;
 

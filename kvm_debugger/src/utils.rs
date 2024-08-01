@@ -1,9 +1,12 @@
-use std::fs::File;
-use std::io::{BufRead, BufReader};
-use std::process;
 use libc;
+use std::process;
+use std::fs::File;
+use std::io::{
+    BufRead, 
+    BufReader
+};
 
-// Function to find the address of the BSS section for a given PID.
+// Find the address of the BSS section in the child process
 pub fn bss_addr(child: i32) -> Option<usize> {
     let fname = format!("/proc/{}/maps", child);
     let file = File::open(&fname).unwrap_or_else(|err| {
@@ -23,6 +26,7 @@ pub fn bss_addr(child: i32) -> Option<usize> {
         if perms == "rw-p" {
             let addr_range = address.split('-').next().unwrap_or("");
             if let Ok(addr) = usize::from_str_radix(addr_range, 16) {
+                // Assumption: The data at this offset in the BSS isn't used
                 return Some(addr + 0x300);
             }
         }

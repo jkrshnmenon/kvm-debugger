@@ -3,10 +3,9 @@ mod utils;
 mod ptrace;
 mod debugger;
 
-use debugger::{start_debugger, Args};
 use clap::Parser;
-
 use pretty_env_logger;
+use debugger::{start_debugger, Args};
 
 fn main() {
     pretty_env_logger::init();
