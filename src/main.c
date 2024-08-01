@@ -56,6 +56,10 @@ void trace_vm(char *vm_path, char **vm_args) {
 
     pid_t child = start_vm(vm_path, vm_args);
     waitpid(child, &status, 0);
+    if (WIFEXITED(status)) {
+        log_error(stderr, "Child exited\n");
+        exit(EXIT_FAILURE);
+    }
 
     while (trace_one_syscall(child, &regs) == 0) {
 #ifdef __x86_64__
