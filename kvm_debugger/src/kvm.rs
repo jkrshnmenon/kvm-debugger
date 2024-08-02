@@ -3,6 +3,8 @@ use kvm_bindings::{
     kvm_regs,
     kvm_run,
     kvm_guest_debug,
+    KVM_EXIT_DEBUG,
+    KVM_EXIT_HLT,
     KVM_GUESTDBG_ENABLE,
     KVM_GUESTDBG_SINGLESTEP,
     KVM_GUESTDBG_USE_SW_BP
@@ -56,4 +58,12 @@ pub fn kvm_guest_debug_obj() -> Vec<u8> {
         )
     };
     content.to_vec()
+}
+
+pub fn is_kvm_exit_debug(exit_reason: u32) -> bool {
+    exit_reason == KVM_EXIT_DEBUG
+}
+
+pub fn is_kvm_exit_hlt(exit_reason: u32) -> bool {
+    exit_reason == KVM_EXIT_HLT
 }

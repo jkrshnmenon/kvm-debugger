@@ -8,26 +8,20 @@ use libc::{
     SYS_ioctl, 
     SYS_mmap, 
     waitpid, 
-    WIFEXITED
+    WIFEXITED,
+    user_regs_struct,
 };
-use kvm_bindings::KVM_EXIT_DEBUG;
 use log::{
     trace, 
-    info, 
     debug, 
+    info, 
+    warn,
     error
 };
 
 use crate::kvm::*;
 use crate::ptrace::{
-    enable_tracing, 
-    execute_ioctl, 
-    finish_syscall, 
-    read_proc_memory, 
-    set_regs, 
-    set_tracesysgood, 
-    trace_one_syscall, 
-    write_proc_memory
+    default_regs, enable_tracing, execute_ioctl, finish_syscall, read_proc_memory, set_regs, set_tracesysgood, trace_one_syscall, write_proc_memory
 };
 use crate::utils::{
     bss_addr, 
@@ -58,7 +52,13 @@ struct KvmDebugger {
     args: Args,
 
     /// The VM for this debugger
-    vm: Vm
+    vm: Vm,
+
+    /// Some information about the debugged process
+    vcpu_fd: u32,
+    syscall_ins_addr: u64,
+    regs: user_regs_struct,
+
 }
 
 
@@ -246,6 +246,7 @@ impl KvmDebugger {
                                 )
                             );
 
+                            // This is what enables the single step apparently
                             kvm_regs.rflags |= 0x100;
 
                             write_proc_memory(self.vm.pid, addr, &kvm_regs_to_vec(kvm_regs));
@@ -259,26 +260,10 @@ impl KvmDebugger {
                                 addr,
                                 &mut result_regs);
                             
-                            trace!("Calling KVM_RUN");
-                            execute_ioctl(
-                                syscall_ins, 
-                                self.vm.pid, 
-                                vcpu_fd as u64,
-                                KVM_RUN,
-                                0,
-                                &mut result_regs);
-
+                            self.vcpu_fd = vcpu_fd;
+                            self.syscall_ins_addr = syscall_ins;
+                            self.regs = result_regs;
                             debug!("Single step should now be enabled");
-                            let exit_reason_vec = read_proc_memory(
-                                self.vm.pid, 
-                                kvm_exit_reason_offset(
-                                    self.get_kvm_run(vcpu_fd)
-                                ), 
-                                8
-                            );
-                            let exit_reason = u64::from_ne_bytes(exit_reason_vec.try_into().unwrap());
-                            assert_eq!(exit_reason as u32, KVM_EXIT_DEBUG);
-                            info!("SUCCESS");
                             enabled = true;
                         },
                         _ => {
@@ -295,6 +280,59 @@ impl KvmDebugger {
         }
 
     }
+
+    fn debug_loop(&self) {
+        trace!("Entering debug loop");
+        trace!("Calling KVM_RUN");
+        let mut exit_reason_vec: Vec<u8>;
+        let mut exit_reason:u64;
+
+        let addr = bss_addr(self.vm.pid).unwrap() as u64;
+        let mut result_regs = self.regs;
+        loop {
+            execute_ioctl(
+                self.syscall_ins_addr, 
+                self.vm.pid, 
+                self.vcpu_fd as u64,
+                KVM_RUN,
+                0,
+                &mut result_regs);
+
+            exit_reason_vec = read_proc_memory(
+                self.vm.pid, 
+                kvm_exit_reason_offset(
+                   self.get_kvm_run(self.vcpu_fd)
+                ), 
+                8
+            );
+            exit_reason = u64::from_ne_bytes(exit_reason_vec.try_into().unwrap());
+            if is_kvm_exit_debug(exit_reason as u32) {
+                trace!("Got KVM_EXIT_DEBUG");
+                execute_ioctl(
+                    self.syscall_ins_addr,
+                    self.vm.pid, 
+                    self.vcpu_fd as u64, 
+                    KVM_GET_REGS, 
+                    addr, 
+                    &mut result_regs);
+            
+                let kvm_regs = kvm_regs_from_vec(
+                    read_proc_memory(
+                        self.vm.pid, 
+                        addr, 
+                        kvm_regs_size()
+                    )
+                );
+                info!("VM RIP: {:#016x}", kvm_regs.rip);
+            } else if is_kvm_exit_hlt(exit_reason as u32) {
+                error!("Got KVM_EXIT_HLT");
+                break;
+            } else {
+                warn!("Unknown exit reason: {:#016x}", exit_reason);
+                continue;
+            }
+        }
+    }
 }
 
 
@@ -305,8 +343,11 @@ pub fn start_debugger(args: Args) {
     };
 
     let mut debugger = KvmDebugger {
-        args,
-        vm
+        args:args,
+        vm:vm,
+        vcpu_fd: 0,
+        syscall_ins_addr: 0,
+        regs: default_regs(),
     };
 
     info!("Forking and executing the VM");
@@ -317,4 +358,7 @@ pub fn start_debugger(args: Args) {
 
     info!("Enabling single step");
     debugger.enable_singlestep();
+
+    info!("Starting the debugger");
+    debugger.debug_loop();
 }
