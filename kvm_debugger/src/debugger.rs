@@ -10,14 +10,7 @@ use libc::{
     waitpid, 
     WIFEXITED
 };
-use kvm_bindings::{
-    kvm_guest_debug, 
-    KVM_EXIT_DEBUG, 
-    KVM_GUESTDBG_ENABLE, 
-    KVM_GUESTDBG_SINGLESTEP, 
-    KVM_GUESTDBG_USE_SW_BP
-};
-use kvm_bindings::bindings::kvm_guest_debug_arch;
+use kvm_bindings::KVM_EXIT_DEBUG;
 use log::{
     trace, 
     info, 
@@ -118,7 +111,7 @@ impl KvmDebugger {
     }
 
     fn add_vcpu(&mut self, vcpu_fd: u32, kvm_run: u64) {
-        debug!("Adding VCPU: {}", vcpu_fd);
+        trace!("Adding VCPU: {}", vcpu_fd);
         self.vm.vcpus.insert(vcpu_fd, kvm_run);
     }
 
@@ -127,7 +120,7 @@ impl KvmDebugger {
     }
 
     fn update_vcpu(&mut self, vcpu_fd: u32, kvm_run: u64) {
-        debug!("Updating VCPU: {} with kvm_run: {:#016x}", vcpu_fd, kvm_run);
+        trace!("Updating VCPU: {} with kvm_run: {:#016x}", vcpu_fd, kvm_run);
         self.vm.vcpus.insert(vcpu_fd, kvm_run);
     }
 
@@ -185,24 +178,8 @@ impl KvmDebugger {
                                 // Create a copy of the registers
                                 let saved_regs = result_regs.clone();
 
-                                let dbg: kvm_guest_debug = kvm_guest_debug {
-                                    control: KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP | KVM_GUESTDBG_USE_SW_BP,
-                                    pad: 0,
-                                    arch: kvm_guest_debug_arch {
-                                        debugreg: [0; 8]
-                                    }
-                                };
-
-                                // Convert dbg into a slice of u8
-                                let content = unsafe {
-                                    std::slice::from_raw_parts(
-                                        &dbg as *const kvm_guest_debug as *const u8,
-                                        std::mem::size_of::<kvm_guest_debug>()
-                                    )
-                                };
-
                                 let addr: u64 = bss_addr(self.vm.pid).unwrap() as u64;
-                                write_proc_memory(self.vm.pid, addr, content);
+                                write_proc_memory(self.vm.pid, addr, kvm_guest_debug_obj().as_slice());
 
                                 trace!("Executing KVM_SET_GUEST_DEBUG ioctl on vcpu_fd: {}", vcpu_fd);
                                 execute_ioctl(
