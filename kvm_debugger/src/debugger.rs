@@ -18,10 +18,19 @@ use log::{
     warn,
     error
 };
+use kvm_bindings::kvm_regs;
 
 use crate::kvm::*;
 use crate::ptrace::{
-    default_regs, enable_tracing, execute_ioctl, finish_syscall, read_proc_memory, set_regs, set_tracesysgood, trace_one_syscall, write_proc_memory
+    default_regs,
+    enable_tracing,
+    execute_ioctl,
+    finish_syscall,
+    read_proc_memory,
+    set_regs,
+    set_tracesysgood,
+    trace_one_syscall,
+    write_proc_memory
 };
 use crate::utils::{
     bss_addr, 
@@ -281,13 +290,32 @@ impl KvmDebugger {
 
     }
 
-    fn debug_loop(&self) {
+    fn get_regs(&self) -> kvm_regs {
+        let addr = bss_addr(self.vm.pid).unwrap() as u64;
+        let mut result_regs = self.regs;
+        execute_ioctl(
+            self.syscall_ins_addr,
+            self.vm.pid, 
+            self.vcpu_fd as u64, 
+            KVM_GET_REGS, 
+            addr, 
+            &mut result_regs);
+        
+        kvm_regs_from_vec(
+            read_proc_memory(
+                self.vm.pid, 
+                addr, 
+                kvm_regs_size()
+            )
+        )
+    }
+
+    pub fn debug_loop(&self) {
         trace!("Entering debug loop");
         trace!("Calling KVM_RUN");
         let mut exit_reason_vec: Vec<u8>;
         let mut exit_reason:u64;
 
-        let addr = bss_addr(self.vm.pid).unwrap() as u64;
         let mut result_regs = self.regs;
         loop {
             execute_ioctl(
@@ -303,26 +331,11 @@ impl KvmDebugger {
                 kvm_exit_reason_offset(
                    self.get_kvm_run(self.vcpu_fd)
                 ), 
-                8
-            );
+                8);
             exit_reason = u64::from_ne_bytes(exit_reason_vec.try_into().unwrap());
             if is_kvm_exit_debug(exit_reason as u32) {
                 trace!("Got KVM_EXIT_DEBUG");
-                execute_ioctl(
-                    self.syscall_ins_addr,
-                    self.vm.pid, 
-                    self.vcpu_fd as u64, 
-                    KVM_GET_REGS, 
-                    addr, 
-                    &mut result_regs);
-            
-                let kvm_regs = kvm_regs_from_vec(
-                    read_proc_memory(
-                        self.vm.pid, 
-                        addr, 
-                        kvm_regs_size()
-                    )
-                );
+                let kvm_regs = self.get_regs();
                 info!("VM RIP: {:#016x}", kvm_regs.rip);
             } else if is_kvm_exit_hlt(exit_reason as u32) {
                 error!("Got KVM_EXIT_HLT");
