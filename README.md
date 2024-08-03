@@ -27,9 +27,11 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 
 - [x] Retrieve registers from the VM using KVM functions
 
-- [ ] Send registers to GDB for debugging
+- [x] Handle other VM exit codes appropriately
 
-- [ ] Handle other VM exit codes appropriately
+- [ ] ~~Send registers to GDB for debugging~~
+
+- [ ] Write a frontend for the debugger
 
 - [ ] Test the debugger with different scenarios
 
@@ -53,3 +55,7 @@ If the VM exit code isn't `KVM_EXIT_DEBUG`, we return the actual exit code back 
 - [x] Fix the process so that it runs the original syscall
 
 - [x] Figure out a better way to execute arbitrary ioctl in process
+
+- [ ] Create wrappers for common functionalities (reg read/write, mem read/write)
+
+- [ ] Some kind of state tracking for vcpu's
