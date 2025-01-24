@@ -3,8 +3,12 @@ use kvm_bindings::{
     kvm_regs,
     kvm_run,
     kvm_guest_debug,
+    // This is for the struct io inside the KVM_RUN struct
+    kvm_run__bindgen_ty_1__bindgen_ty_4,
     KVM_EXIT_DEBUG,
     KVM_EXIT_HLT,
+    KVM_EXIT_IO,
+    KVM_EXIT_MMIO,
     KVM_GUESTDBG_ENABLE,
     KVM_GUESTDBG_SINGLESTEP,
     KVM_GUESTDBG_USE_SW_BP
@@ -18,9 +22,26 @@ pub const KVM_SET_REGS: u64 = 0x4090AE82;
 pub const KVM_GET_SREGS: u64 = 0x8138AE83;
 pub const KVM_SET_GUEST_DEBUG: u64 = 0x4048ae9b;
 
+pub fn kvm_exit_reason(kvm_exit_code: u32) -> String {
+    match kvm_exit_code {
+        KVM_EXIT_DEBUG => "KVM_EXIT_DEBUG".to_string(),
+        KVM_EXIT_HLT => "KVM_EXIT_HLT".to_string(),
+        KVM_EXIT_IO => "KVM_EXIT_IO".to_string(),
+        KVM_EXIT_MMIO => "KVM_EXIT_MMIO".to_string(),
+        _ => format!("Unknown exit code: {}", kvm_exit_code)
+    }
+}
 
 pub fn kvm_regs_size() -> usize {
     std::mem::size_of::<kvm_regs>()
+}
+
+pub fn kvm_io_size() -> usize {
+    std::mem::size_of::<kvm_run__bindgen_ty_1__bindgen_ty_4>()
+}
+
+pub fn kvm_io_from_vec(vec: Vec<u8>) -> kvm_run__bindgen_ty_1__bindgen_ty_4 {
+    unsafe { std::ptr::read(vec.as_ptr() as *const kvm_run__bindgen_ty_1__bindgen_ty_4) }
 }
 
 pub fn kvm_regs_from_vec(vec: Vec<u8>) -> kvm_regs {
@@ -38,6 +59,14 @@ pub fn kvm_regs_to_vec(regs: kvm_regs) -> Vec<u8> {
 
 pub fn kvm_exit_reason_offset(kvm_run_ptr: u64) -> u64 {
     let offset = offset_of!(kvm_run, exit_reason);
+    kvm_run_ptr + offset as u64
+}
+
+
+pub fn kvm_io_offset(kvm_run_ptr: u64) -> u64 {
+    // In the KVM_RUN struct, the io field is part of a union represented by __bindgen_anon_1
+    // https://github.com/rust-vmm/kvm-bindings/blob/a08cb7a9976d172b53a99e2eaaf9f67aa7351c45/src/x86_64/bindings.rs#L3593
+    let offset = offset_of!(kvm_run, __bindgen_anon_1);
     kvm_run_ptr + offset as u64
 }
 
@@ -66,4 +95,8 @@ pub fn is_kvm_exit_debug(exit_reason: u32) -> bool {
 
 pub fn is_kvm_exit_hlt(exit_reason: u32) -> bool {
     exit_reason == KVM_EXIT_HLT
+}
+
+pub fn is_kvm_exit_io(exit_reason: u32) -> bool {
+    exit_reason == KVM_EXIT_IO
 }
