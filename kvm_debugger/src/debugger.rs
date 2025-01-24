@@ -20,7 +20,7 @@ use log::{
 };
 use kvm_bindings::kvm_regs;
 
-use crate::kvm::*;
+use crate::kvm::{self, *};
 use crate::ptrace::{
     default_regs,
     enable_tracing,
@@ -31,6 +31,10 @@ use crate::ptrace::{
     set_tracesysgood,
     trace_one_syscall,
     write_proc_memory
+};
+use crate::tui::{
+    display_for_exit_debug,
+    display_for_exit_io,
 };
 use crate::utils::{
     bss_addr, 
@@ -310,6 +314,18 @@ impl KvmDebugger {
         )
     }
 
+    fn get_stack_content(&self, stack_addr: u64, num_qwords: u32) -> Vec<u64> {
+        let content = read_proc_memory(self.vm.pid,
+            stack_addr, 
+            num_qwords as usize * 8
+        );
+
+        // Convert each group of 8 bytes to a u64
+        content.chunks_exact(8)
+            .map(|chunk| u64::from_ne_bytes(chunk.try_into().unwrap()))
+            .collect()
+    }
+
     pub fn debug_loop(&self) {
         trace!("Entering debug loop");
         trace!("Calling KVM_RUN");
@@ -336,12 +352,33 @@ impl KvmDebugger {
             if is_kvm_exit_debug(exit_reason as u32) {
                 trace!("Got KVM_EXIT_DEBUG");
                 let kvm_regs = self.get_regs();
+                let stack_content = self.get_stack_content(kvm_regs.rsp, 8);
+                display_for_exit_debug(kvm_regs, stack_content);
                 info!("VM RIP: {:#016x}", kvm_regs.rip);
             } else if is_kvm_exit_hlt(exit_reason as u32) {
                 error!("Got KVM_EXIT_HLT");
                 break;
+            } else if is_kvm_exit_io(exit_reason as u32) {
+                trace!("Got KVM_EXIT_IO");
+                let kvm_io = kvm_io_from_vec(
+                    read_proc_memory(
+                        self.vm.pid, 
+                        kvm_io_offset(
+                            self.get_kvm_run(self.vcpu_fd)
+                        ), 
+                        kvm_io_size()
+                    )
+                );
+                let data_offset = kvm_io.data_offset as u64;
+                let data_len = kvm_io.size as usize;
+                let data = read_proc_memory(
+                    self.vm.pid,
+                    self.get_kvm_run(self.vcpu_fd) + data_offset,
+                    data_len
+                );
+                display_for_exit_io(kvm_io.direction, kvm_io.port, data);
             } else {
-                warn!("Unknown exit reason: {:#016x}", exit_reason);
+                warn!("Other exit reason: {}", kvm_exit_reason(exit_reason as u32));
                 continue;
             }
         }

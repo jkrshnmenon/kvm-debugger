@@ -1,3 +1,4 @@
+mod tui;
 mod kvm;
 mod utils;
 mod ptrace;
