@@ -1,10 +1,10 @@
 diff --git a/Makefile b/Makefile
-index 22b6a98..a047c4b 100644
+index 22b6a98..ddb2657 100644
 --- a/Makefile
 +++ b/Makefile
 @@ -1,4 +1,4 @@
 -CFLAGS = -Wall -Wextra -Werror -O2
-+CFLAGS = -no-pie -Wall -Wextra -Werror -O2
++CFLAGS = -no-pie -Wall -Wextra -O2
  
  .PHONY: run
  run: kvm-hello-world
